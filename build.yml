@@ -1,0 +1,108 @@
+name: Build APK
+
+on:
+  push:
+    branches: [builds]
+    paths: ["builds/incoming.zip"]
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Préparation
+        uses: actions/checkout@v4
+        with:
+          ref: builds
+
+      - name: Extraction
+        run: |
+          mkdir -p project
+          unzip -q builds/incoming.zip -d project
+          # Si le zip contient un unique dossier racine, on s'aligne dessus
+          entries=(project/*)
+          if [ "${#entries[@]}" -eq 1 ] && [ -d "${entries[0]}" ]; then
+            mv "${entries[0]}"/* project/
+          fi
+          chmod +x project/gradlew
+
+      - name: Analyse
+        id: analyze
+        run: |
+          CONFIG=builds/build-config.json
+          echo "build_type=$(jq -r '.buildType // "debug"' $CONFIG)" >> "$GITHUB_OUTPUT"
+          echo "apk_name=$(jq -r '.apkName // "app"' $CONFIG)" >> "$GITHUB_OUTPUT"
+          echo "version_name=$(jq -r '.versionName // empty' $CONFIG)" >> "$GITHUB_OUTPUT"
+          echo "version_code=$(jq -r '.versionCode // empty' $CONFIG)" >> "$GITHUB_OUTPUT"
+          cat $CONFIG
+
+      - name: Installation Gradle
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      - name: Compilation
+        working-directory: project
+        run: |
+          TASK="assembleDebug"
+          EXTRA_ARGS=""
+          if [ "${{ steps.analyze.outputs.build_type }}" = "release" ]; then
+            TASK="assembleRelease"
+          fi
+          if [ -n "${{ steps.analyze.outputs.version_name }}" ]; then
+            EXTRA_ARGS="$EXTRA_ARGS -PversionNameOverride=${{ steps.analyze.outputs.version_name }}"
+          fi
+          if [ -n "${{ steps.analyze.outputs.version_code }}" ]; then
+            EXTRA_ARGS="$EXTRA_ARGS -PversionCodeOverride=${{ steps.analyze.outputs.version_code }}"
+          fi
+          ./gradlew $TASK $EXTRA_ARGS --no-daemon
+
+      # Étape optionnelle : ne s'exécute que si les secrets de signature
+      # sont configurés dans le dépôt (Settings > Secrets and variables > Actions).
+      - name: Signature
+        if: steps.analyze.outputs.build_type == 'release'
+        working-directory: project
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "Aucun secret de signature configuré, l'APK release reste non signée."
+            exit 0
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > release.keystore
+          APK=$(find app/build/outputs/apk -name "*.apk" | head -n1)
+          $ANDROID_HOME/build-tools/*/apksigner sign \
+            --ks release.keystore \
+            --ks-pass pass:"$KEYSTORE_PASSWORD" \
+            --ks-key-alias "$KEY_ALIAS" \
+            --key-pass pass:"$KEY_PASSWORD" \
+            "$APK"
+
+      - name: Création APK
+        id: apk
+        working-directory: project
+        run: |
+          APK_PATH=$(find app/build/outputs/apk -name "*.apk" | head -n1)
+          if [ -z "$APK_PATH" ]; then
+            echo "Aucune APK produite." >&2
+            exit 1
+          fi
+          NAME="${{ steps.analyze.outputs.apk_name }}.apk"
+          cp "$APK_PATH" "$NAME"
+          echo "apk_path=project/$NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Publication
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.analyze.outputs.apk_name }}
+          path: ${{ steps.apk.outputs.apk_path }}
+          retention-days: 30
