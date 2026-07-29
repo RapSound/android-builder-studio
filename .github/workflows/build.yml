@@ -3,7 +3,6 @@ name: Build APK
 on:
   push:
     branches: [builds]
-    paths: ["builds/incoming.zip"]
 
 permissions:
   contents: write
