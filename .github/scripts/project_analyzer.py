@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from repair_utils import (
     walk_files, read_text, detect_package, package_to_path,
     detect_agp_version, detect_gradle_version_from_wrapper,
-    RESOURCE_DIRS, is_resource_dir, KOTLIN_VERSION_RE,
+    RESOURCE_DIRS, is_resource_dir, is_resource_dir_in_context, KOTLIN_VERSION_RE,
 )
 
 KOTLIN_EXTS = (".kt",)
@@ -215,10 +215,12 @@ def analyze_project(project_root: str) -> dict:
         if abs_p.endswith(JAVA_EXTS):
             java_files.append((abs_p, rel_p))
 
-        # Ressources
+        # Ressources — un segment ne compte que s'il est un enfant direct de
+        # "res" (voir is_resource_dir_in_context : évite de traiter un dossier
+        # de package Kotlin comme com/.../navigation/ comme une ressource).
         parts = Path(rel_p).parts
         for i, part in enumerate(parts):
-            if is_resource_dir(part):
+            if is_resource_dir_in_context(parts, i):
                 res_files.append((abs_p, rel_p))
                 break
 
@@ -309,7 +311,7 @@ def analyze_project(project_root: str) -> dict:
         if "src/main/res/" not in rel_p:
             parts = Path(rel_p).parts
             for i, part in enumerate(parts):
-                if is_resource_dir(part):
+                if is_resource_dir_in_context(parts, i):
                     expected = "app/src/main/res/" + "/".join(parts[i:])
                     misplaced.append({
                         "file": rel_p,
@@ -399,4 +401,4 @@ if __name__ == "__main__":
 
     if "--json" in sys.argv or True:
         print(json.dumps(result, indent=2, ensure_ascii=False))
-              
+                                          
