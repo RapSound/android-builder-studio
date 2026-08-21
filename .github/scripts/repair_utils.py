@@ -163,6 +163,24 @@ def is_resource_dir(dirname: str) -> bool:
     return base in RESOURCE_DIRS or dirname in RESOURCE_DIRS
 
 
+def is_resource_dir_in_context(parts, index) -> bool:
+    """True seulement si parts[index] est à la fois un nom de dossier ressource
+    reconnu ET un enfant direct d'un dossier "res" (le seul endroit où Android
+    résout réellement les ressources). Évite les faux positifs sur des segments
+    de package Kotlin/Java qui partagent un nom avec un dossier ressource —
+    ex. com/.../navigation/, com/.../color/, com/.../menu/ — qui ne sont PAS
+    sous res/ et ne doivent jamais être déplacés là-bas.
+
+    C'est le correctif du bug qui déplaçait
+    app/src/main/java/.../navigation/NavGraph.kt vers
+    app/src/main/res/navigation/NavGraph.kt : "navigation" matchait
+    RESOURCE_DIRS sans vérifier qu'il s'agissait bien d'un sous-dossier de res/.
+    """
+    if not is_resource_dir(parts[index]):
+        return False
+    return index > 0 and parts[index - 1] == "res"
+
+
 # ─── Détection AGP dans Gradle ───────────────────────────────────────────────
 
 AGP_PLUGIN_RE = re.compile(
@@ -202,4 +220,4 @@ def safe_move(src: str, dst: str, quarantine_base: str, report: dict):
         log_action(report, "warnings",
                    msg=f"Fichier existant déplacé en quarantaine : {dst} → {q_path}")
     shutil.move(src, dst)
-              
+    
