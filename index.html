@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Android Builder Studio</title>
+<link rel="icon" href="favicon.svg" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div class="bg-glow"></div>
+
+<header class="topbar">
+  <div class="brand">
+    <img src="logo.svg" alt="" class="brand-logo" />
+    <span class="brand-name">Android Builder Studio</span>
+  </div>
+  <nav class="topnav">
+    <button class="navbtn" data-panel="settings">Paramètres</button>
+    <button class="navbtn" data-panel="history">Historique</button>
+    <button id="authBtn" class="navbtn navbtn-accent">Se connecter à GitHub</button>
+  </nav>
+</header>
+
+<main class="stage">
+
+  <!-- ── Zone de dépôt ─────────────────────────────────────────────────────── -->
+  <section id="hero" class="panel panel-hero">
+    <h1>Android Builder Studio</h1>
+    <p class="subtitle">Déposez votre ZIP — même mal rangé, il sera reconstruit automatiquement.</p>
+
+    <div id="dropzone" class="dropzone">
+      <input type="file" id="fileInput" accept=".zip" hidden />
+      <div class="dropzone-icon">📦</div>
+      <p class="dropzone-text">Glissez votre fichier ZIP ici</p>
+      <p class="dropzone-sub">ou</p>
+      <button id="chooseZipBtn" class="btn btn-primary">Choisir un ZIP</button>
+    </div>
+  </section>
+
+  <!-- ── Panneau d'analyse ──────────────────────────────────────────────────── -->
+  <section id="analysisPanel" class="panel hidden">
+    <h2 class="panel-title">Analyse du projet</h2>
+
+    <!-- Statut global -->
+    <div id="analysisStatus" class="analysis-status loading">Analyse en cours…</div>
+
+    <!-- Erreur bloquante (code source absent) -->
+    <div id="analysisCriticalSection" class="hidden">
+      <div class="alert alert-error">
+        <div class="alert-icon">✕</div>
+        <div>
+          <strong>Projet non reconstructible</strong>
+          <ul id="analysisCritical"></ul>
+          <p class="hint" style="margin-top:6px;">Le code source Android est introuvable dans le ZIP. Sans fichier .kt ou .java, il n'y a rien à compiler.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Score de préparation -->
+    <div id="analysisScoreSection" class="hidden">
+      <div class="score-block">
+        <div class="score-header">
+          <span class="score-label">Préparation du projet</span>
+          <span id="scorePct" class="score-pct">0%</span>
+        </div>
+        <div class="score-bar-outer">
+          <div id="scoreBar" class="score-bar-inner"></div>
+        </div>
+        <div id="scoreChecks" class="score-checks"></div>
+      </div>
+
+      <!-- Stats projet -->
+      <div class="stats-grid">
+        <div class="stat-item">
+          <span class="stat-label">Fichiers source</span>
+          <span id="statSourceFiles" class="stat-value">—</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Langage</span>
+          <span id="statLang" class="stat-value">—</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Package(s)</span>
+          <span id="statPackages" class="stat-value">—</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Module</span>
+          <span id="statModules" class="stat-value">—</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Manifests</span>
+          <span id="statManifests" class="stat-value">—</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">AGP détecté</span>
+          <span id="statAgp" class="stat-value">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Plan de reconstruction -->
+    <div id="analysisRepairSection" class="hidden">
+      <div class="repair-plan-header">
+        <span class="repair-plan-title">🔧 Plan de reconstruction</span>
+      </div>
+      <div id="repairSummary" class="repair-summary"></div>
+      <button id="autoRepairBtn" class="btn btn-accent btn-repair">
+        Reconstruire automatiquement
+      </button>
+    </div>
+
+    <!-- Avertissements non-bloquants -->
+    <div id="analysisWarningsSection" class="hidden">
+      <div class="alert alert-warn">
+        <div class="alert-icon">⚠</div>
+        <div>
+          <strong>Avertissements</strong>
+          <ul id="analysisWarnings"></ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Projet détecté ─────────────────────────────────────────────────────── -->
+  <section id="projectCard" class="panel panel-card hidden">
+    <h2>Projet prêt à compiler</h2>
+    <div class="card-grid">
+      <div class="card-item"><span class="label">Nom</span><span id="pcName" class="value">—</span></div>
+      <div class="card-item"><span class="label">Taille</span><span id="pcSize" class="value">—</span></div>
+      <div class="card-item"><span class="label">Fichiers ZIP</span><span id="pcFiles" class="value">—</span></div>
+      <div class="card-item"><span class="label">Package</span><span id="pcPackage" class="value">—</span></div>
+      <div class="card-item"><span class="label">Version</span><span id="pcVersion" class="value">—</span></div>
+      <div class="card-item"><span class="label">SDK Min</span><span id="pcSdkMin" class="value">—</span></div>
+      <div class="card-item"><span class="label">SDK Target</span><span id="pcSdkTarget" class="value">—</span></div>
+      <div class="card-item"><span class="label">Langage</span><span id="pcLang" class="value">—</span></div>
+      <div class="card-item"><span class="label">Module</span><span id="pcModule" class="value">—</span></div>
+      <div class="card-item"><span class="label">AGP</span><span id="pcAgp" class="value">—</span></div>
+    </div>
+    <button id="compileBtn" class="btn btn-accent btn-large">⚡ Compiler</button>
+  </section>
+
+  <!-- ── Compilation en cours ───────────────────────────────────────────────── -->
+  <section id="progressCard" class="panel panel-card hidden">
+    <h2>Compilation en cours</h2>
+    <ol id="stepsList" class="steps-list">
+      <li data-step="prepare">Préparation</li>
+      <li data-step="extract">Extraction</li>
+      <li data-step="analyze_project">Analyse</li>
+      <li data-step="reconstruct">Reconstruction</li>
+      <li data-step="analyze">Config</li>
+      <li data-step="gradle">Gradle</li>
+      <li data-step="compile">Compilation</li>
+      <li data-step="sign">Signature</li>
+      <li data-step="apk">APK</li>
+      <li data-step="publish">Publication</li>
+      <li data-step="done">Terminé</li>
+    </ol>
+    <div class="progress-bar-outer">
+      <div id="progressBarInner" class="progress-bar-inner"></div>
+    </div>
+    <div class="progress-meta">
+      <span id="progressPercent">0%</span>
+      <span id="progressEta">Temps écoulé : —</span>
+    </div>
+    <details class="logs">
+      <summary>Logs</summary>
+      <pre id="logsOutput"></pre>
+    </details>
+  </section>
+
+  <!-- ── Succès ─────────────────────────────────────────────────────────────── -->
+  <section id="resultCard" class="panel panel-card panel-success hidden">
+    <div class="success-icon">✓</div>
+    <h2>APK créée avec succès</h2>
+    <div class="card-grid">
+      <div class="card-item"><span class="label">Nom</span><span id="resName" class="value">—</span></div>
+      <div class="card-item"><span class="label">Poids</span><span id="resSize" class="value">—</span></div>
+      <div class="card-item"><span class="label">Version</span><span id="resVersion" class="value">—</span></div>
+      <div class="card-item"><span class="label">Date</span><span id="resDate" class="value">—</span></div>
+    </div>
+    <button id="downloadBtn" class="btn btn-accent btn-large">⬇ Télécharger l'APK</button>
+  </section>
+
+  <!-- ── Erreur ─────────────────────────────────────────────────────────────── -->
+  <section id="errorCard" class="panel panel-card panel-error hidden">
+    <div class="error-icon">✕</div>
+    <h2 id="errorTitle">Erreur</h2>
+    <p id="errorMessage" class="error-message"></p>
+
+    <!-- Diagnostic structuré -->
+    <div id="errorDiagnostic" class="error-diagnostic hidden">
+      <div class="diagnostic-title">Diagnostic automatique</div>
+      <div id="diagnosticContent"></div>
+    </div>
+
+    <details class="logs" open>
+      <summary>Logs de compilation</summary>
+      <pre id="errorLogs"></pre>
+    </details>
+
+    <div class="error-actions">
+      <button id="retryBtn" class="btn btn-accent">↺ Réessayer</button>
+      <button id="downloadFullLogBtn" class="btn btn-ghost">⬇ Log complet</button>
+    </div>
+
+    <!-- Suggestions de correction -->
+    <div id="errorSuggestions" class="hidden">
+      <div class="suggestions-title">💡 Suggestions</div>
+      <ul id="suggestionsList"></ul>
+    </div>
+  </section>
+
+</main>
+
+<!-- ── Panneau Paramètres ─────────────────────────────────────────────────── -->
+<aside id="settingsPanel" class="side-panel hidden">
+  <div class="side-panel-header">
+    <h3>Paramètres</h3>
+    <button class="closeBtn" data-close="settings">✕</button>
+  </div>
+  <div class="side-panel-body">
+    <label class="field">
+      <span>Mode de build</span>
+      <select id="buildType">
+        <option value="debug">Debug</option>
+        <option value="release">Release</option>
+      </select>
+    </label>
+    <label class="field">
+      <span>Nom de l'APK</span>
+      <input type="text" id="apkName" placeholder="mon-app" />
+    </label>
+    <label class="field">
+      <span>Nom de l'application</span>
+      <input type="text" id="appName" placeholder="Mon Application" />
+    </label>
+    <label class="field">
+      <span>Version (versionName)</span>
+      <input type="text" id="versionName" placeholder="1.0.0" />
+    </label>
+    <label class="field">
+      <span>Version Code</span>
+      <input type="number" id="versionCode" placeholder="1" />
+    </label>
+    <label class="field">
+      <span>Icône personnalisée</span>
+      <input type="file" id="customIcon" accept="image/*" />
+    </label>
+    <label class="field">
+      <span>Orientation</span>
+      <select id="orientation">
+        <option value="auto">Auto</option>
+        <option value="portrait">Portrait</option>
+        <option value="landscape">Landscape</option>
+      </select>
+    </label>
+    <button id="saveSettingsBtn" class="btn btn-primary">Enregistrer</button>
+    <hr class="divider" />
+    <p class="hint">Connexion GitHub</p>
+    <label class="field">
+      <span>Propriétaire du dépôt</span>
+      <input type="text" id="cfgOwner" placeholder="ton-pseudo" />
+    </label>
+    <label class="field">
+      <span>Nom du dépôt</span>
+      <input type="text" id="cfgRepo" placeholder="android-builder-studio" />
+    </label>
+    <button id="saveGithubCfgBtn" class="btn btn-primary">Enregistrer la connexion</button>
+  </div>
+</aside>
+
+<!-- ── Panneau Historique ────────────────────────────────────────────────── -->
+<aside id="historyPanel" class="side-panel hidden">
+  <div class="side-panel-header">
+    <h3>Historique</h3>
+    <button class="closeBtn" data-close="history">✕</button>
+  </div>
+  <div class="side-panel-body">
+    <ul id="historyList" class="history-list">
+      <li class="history-empty">Aucune compilation pour le moment.</li>
+    </ul>
+  </div>
+</aside>
+
+<!-- ── Modale Device Flow ─────────────────────────────────────────────────── -->
+<div id="authModal" class="modal hidden">
+  <div class="modal-card">
+    <h3>Connexion à GitHub</h3>
+    <p>Rends-toi sur <a id="authUri" href="#" target="_blank" rel="noopener">github.com/login/device</a> et entre le code :</p>
+    <div id="authCode" class="auth-code">— — — — — —</div>
+    <p class="hint">En attente de validation…</p>
+    <button class="btn btn-ghost" data-close-modal="auth">Annuler</button>
+  </div>
+</div>
+
+<div id="toastContainer" class="toast-container"></div>
+
+<script src="config.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
